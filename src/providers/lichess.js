@@ -1,3 +1,4 @@
+import { chesscomLinksFromLichessProfile } from '../core/linking.js';
 import { TIME_CLASSES } from '../core/timeClasses.js';
 import { ProviderError, checkResponse } from './errors.js';
 
@@ -7,6 +8,15 @@ export async function fetchLichessPlayer(username) {
     headers: { Accept: 'application/json' },
   });
   return normalizeLichess(await checkResponse(res).json());
+}
+
+/** Like fetchLichessPlayer, but returns null instead of throwing (for optional lookups). */
+export async function tryFetchLichessPlayer(username) {
+  try {
+    return await fetchLichessPlayer(username);
+  } catch {
+    return null;
+  }
 }
 
 export function normalizeLichess(data) {
@@ -26,5 +36,8 @@ export function normalizeLichess(data) {
     perfs,
     // Lichess reports real total playtime (all variants, seconds).
     playTimeSeconds: data.playTime?.total ?? null,
+    createdAt: data.createdAt ?? null,
+    // chess.com accounts this player links from their profile (lowercase)
+    chesscomLinks: chesscomLinksFromLichessProfile(data.profile),
   };
 }

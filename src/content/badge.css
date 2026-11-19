@@ -36,7 +36,7 @@
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  min-width: 260px;
+  min-width: 420px;
   padding: 8px 10px;
   border-radius: 8px;
   background: #222;
@@ -49,11 +49,14 @@
 .cii-floating .cii-details { top: auto; bottom: calc(100% + 6px); left: auto; right: 0; }
 .cii-details[hidden] { display: none; }
 
-.cii-row { display: grid; grid-template-columns: 70px 56px 1fr; gap: 6px; padding: 2px 0; }
+.cii-row { display: grid; grid-template-columns: 70px 62px 1fr; gap: 6px; padding: 2px 0; }
 .cii-tc { text-transform: capitalize; }
 .cii-val { font-weight: 600; }
 .cii-val.cii-low   { color: #e57373; }
 .cii-val.cii-good  { color: #81c784; }
 .cii-val.cii-great { color: #ffd54f; }
 .cii-meta { opacity: 0.7; white-space: nowrap; }
+.cii-note { margin: 0 0 2px 76px; font-size: 11px; opacity: 0.6; font-style: italic; }
+.cii-link { margin-top: 6px; font-size: 12px; color: #81c784; }
+.cii-link-possible { color: #bbb; }
 .cii-foot { margin-top: 4px; opacity: 0.55; font-size: 11px; }

@@ -7,6 +7,15 @@ export async function fetchChesscomPlayer(username) {
   return normalizeChesscom(username, await checkResponse(res).json());
 }
 
+/** Like fetchChesscomPlayer, but returns null instead of throwing (for optional lookups). */
+export async function tryFetchChesscomPlayer(username) {
+  try {
+    return await fetchChesscomPlayer(username);
+  } catch {
+    return null;
+  }
+}
+
 const KEYS = { bullet: 'chess_bullet', blitz: 'chess_blitz', rapid: 'chess_rapid' };
 
 // chess.com has no "provisional" flag; a high RD is the closest signal.

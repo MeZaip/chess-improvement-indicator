@@ -13,10 +13,21 @@
     return 'great';
   }
 
-  function fmt(ii) {
+  function fmt(ii, { approx = false, capped = false } = {}) {
     if (ii == null) return '–';
+    if (capped) return `≥${ii.toFixed(0)}x`;
     if (ii < 0.1) return '<0.1x';
-    return `${ii.toFixed(2)}x`;
+    return `${approx ? '~' : ''}${ii.toFixed(2)}x`;
+  }
+
+  // Short explanations shown under a time class when needed.
+  function notes(c) {
+    const out = [];
+    if (c.flags?.belowStart) out.push('below the typical beginner level');
+    if (c.flags?.extrapolated) out.push('very rare rating – the value is an estimate');
+    if (c.flags?.beyondExperience) out.push('more games than anyone in our sample – compared with the most experienced players');
+    if (c.capped) out.push('capped at 20x');
+    return out;
   }
 
   function el(tag, cls, text) {
@@ -32,13 +43,41 @@
       const row = el('div', 'cii-row');
       row.append(
         el('span', 'cii-tc', c.timeClass),
-        el('span', `cii-val cii-${tier(c.ii)}`, c.status === 'ok' ? fmt(c.ii) : 'n/a'),
-        el('span', 'cii-meta', `${c.rating} · ${c.games} games · avg ${Math.round(c.expectedRating)}`),
+        el(
+          'span',
+          `cii-val cii-${tier(c.ii)}`,
+          c.status === 'ok' ? fmt(c.ii, { approx: c.flags.extrapolated, capped: c.capped }) : 'n/a',
+        ),
+        el(
+          'span',
+          'cii-meta',
+          c.status === 'ok'
+            ? `${c.rating} · ${c.games} games` +
+                (c.effectiveGames > c.games ? ` (+${Math.round(c.effectiveGames - c.games)} other TCs)` : '') +
+                ` · typical ${Math.round(c.typical)} · scores ~${Math.round(c.expectedScore * 100)}% vs typical`
+            : `${c.rating} · ${c.games} games · needs ≥30 non-provisional games`,
+        ),
       );
       box.append(row);
+      for (const n of c.status === 'ok' ? notes(c) : []) box.append(el('div', 'cii-note', n));
     }
     const pt = report.playtime;
+    const ln = report.linked;
+    if (ln) {
+      const site = ln.platform === 'chesscom' ? 'chess.com' : 'lichess';
+      box.append(
+        el(
+          'div',
+          ln.counted ? 'cii-link' : 'cii-link cii-link-possible',
+          ln.counted
+            ? `✓ includes ${ln.games} games from ${site}/${ln.username} (linked in Lichess profile)`
+            : `? ${site}/${ln.username} has the same name (${ln.games} games) – not counted: ` +
+                'add the chess.com profile link to the Lichess profile to merge',
+        ),
+      );
+    }
     box.append(
+      el('div', 'cii-foot', 'ii: how far you climbed vs. a typical player with the same experience (1.00x = typical)'),
       el('div', 'cii-foot', `${Math.round(pt.hours)}h playtime${pt.estimated ? ' (estimated)' : ''}`),
       el('div', 'cii-foot', `baseline: ${report.baselineVersion}`),
     );
@@ -80,9 +119,10 @@
   function renderReport(anchor, report) {
     const badge = getOrCreateBadge(anchor);
     const hasData = report.overall != null;
+    const approx = report.classes.some((c) => c.status === 'ok' && c.flags.extrapolated);
     setContent(
       badge,
-      hasData ? fmt(report.overall) : 'n/a',
+      hasData ? fmt(report.overall, { approx }) : 'n/a',
       `cii-${tier(report.overall)}`,
       hasData ? 'Improvement vs. average player (click for details)' : 'Not enough rated games yet',
     );

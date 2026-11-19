@@ -5,6 +5,12 @@
   "type": "module",
   "description": "Chrome extension: improvement indicator (ii) on lichess.org and chess.com profiles",
   "scripts": {
-    "test": "node --test \"tests/**/*.test.js\""
+    "test": "node --test \"tests/**/*.test.js\"",
+    "collect:lichess": "node tools/collect.js lichess",
+    "tail:lichess": "node tools/collect.js lichess --tail",
+    "collect:chesscom": "node tools/collect.js chesscom",
+    "tail:chesscom": "node tools/collect.js chesscom --tail",
+    "link": "node tools/link.js",
+    "fit": "node tools/fit.js"
   }
 }

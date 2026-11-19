@@ -1,49 +1,48 @@
-import { expectedRating, gamesToReach } from './baseline.js';
+import { improvement } from './baseline.js';
 
-// Below this many games the rating is too noisy to say anything.
+// Below this many games in the time class the rating is too noisy.
 export const MIN_GAMES = 30;
 
-// Cap so a strong OTB player opening a fresh account doesn't show 4000x.
+// Display cap (a 2700 on a fresh account would otherwise show absurd values).
 export const MAX_II = 20;
 
 /**
  * Improvement indicator for one time class.
  *
- * Same idea as osu! ii: compare the effort the AVERAGE player needs to reach
- * this rating with the effort this player actually spent.
+ *   ii ≈ (your rating − start level) / (typical rating − start level)
  *
- *   ii = gamesToReach(rating) / games
+ * where "typical" is the median rating of players with the same experience
+ * (effective games, see effort.js), and Elo far above typical is weighted by
+ * how hard it is to reach (see baseline.js).
  *
- * ii = 1   → improving like the average player
- * ii = 2   → reached this rating in half the games
- * ii = 0.5 → needed twice as many games as average
+ * ii = 1   → typical for your experience
+ * ii = 2   → you climbed about twice as far as typical with that experience
+ * ii = 0.5 → half as far
  *
  * @param {{rating:number, games:number, provisional:boolean}} perf
- * @param {{r0:number, a:number, g0:number}} baseline
+ * @param {object} baseline  see baseline.js
+ * @param {number} [effort]  effective games (defaults to games in this class)
  */
-export function computeIndicator(perf, baseline) {
-  const { rating, games, provisional } = perf;
-  const expected = expectedRating(baseline, games);
-
-  if (provisional || games < MIN_GAMES) {
-    return { status: 'insufficient', ii: null, expectedRating: expected, expectedGames: null };
+export function computeIndicator(perf, baseline, effort = perf.games) {
+  if (perf.provisional || perf.games < MIN_GAMES) {
+    return { status: 'insufficient', ii: null, typical: null, expectedScore: null, flags: {} };
   }
-
-  const expectedGames = gamesToReach(baseline, rating);
-  const ii = Math.min(expectedGames / games, MAX_II);
-  return { status: 'ok', ii, expectedRating: expected, expectedGames };
+  const r = improvement(baseline, perf.rating, effort);
+  return { status: 'ok', ...r, ii: Math.min(r.ii, MAX_II), capped: r.ii > MAX_II };
 }
 
 /**
  * Combine per-time-class indicators into one number.
- * Games-weighted geometric mean: ii is a ratio, so averaging logs is the
- * right thing (2x and 0.5x should average to 1x, not 1.25x).
- * Zero values (rating below the baseline floor) are clamped to a small epsilon.
+ * Weighted geometric mean: ii is a ratio, so averaging logs is the right
+ * thing (2x and 0.5x average to 1x, not 1.25x). Weight = `weight` field
+ * (time spent in that class, see report.js), falling back to games.
+ * Zero values are clamped to a small epsilon.
  */
 export function combineIndicators(entries) {
   const ok = entries.filter((e) => e.status === 'ok');
-  const totalGames = ok.reduce((s, e) => s + e.games, 0);
-  if (totalGames === 0) return null;
-  const logSum = ok.reduce((s, e) => s + e.games * Math.log(Math.max(e.ii, 0.01)), 0);
-  return Math.exp(logSum / totalGames);
+  const w = (e) => e.weight ?? e.games;
+  const total = ok.reduce((s, e) => s + w(e), 0);
+  if (total === 0) return null;
+  const logSum = ok.reduce((s, e) => s + w(e) * Math.log(Math.max(e.ii, 0.01)), 0);
+  return Math.exp(logSum / total);
 }

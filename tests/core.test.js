@@ -1,31 +1,72 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { expectedRating, gamesToReach, getBaseline } from '../src/core/baseline.js';
+import { BAND, difficulty, expectedScore, getBaseline, improvement, typicalRating } from '../src/core/baseline.js';
 import { MIN_GAMES, combineIndicators, computeIndicator } from '../src/core/indicator.js';
 import { buildReport } from '../src/core/report.js';
 import { normalizeChesscom } from '../src/providers/chesscom.js';
 import { normalizeLichess } from '../src/providers/lichess.js';
 
-const blitz = getBaseline('lichess', 'blitz');
+// Hand-made model: typical 1300 → 1900 over 30 → 30000 games, start 900,
+// difficulty from a normal distribution (mean 1500, sd 300).
+const normT = (r) => {
+  const z = (r - 1500) / 300;
+  const t = 1 / (1 + 0.2316419 * Math.abs(z));
+  const d = 0.3989423 * Math.exp((-z * z) / 2);
+  const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+  return -Math.log(z > 0 ? p : 1 - p);
+};
+const blitz = {
+  curve: [[30, 1300], [300, 1500], [3000, 1700], [30000, 1900]],
+  start: 900,
+  difficulty: Array.from({ length: 81 }, (_, i) => [i * 50, normT(i * 50)]),
+  reliableMax: 2500,
+};
 
-test('gamesToReach is the inverse of expectedRating', () => {
-  for (const g of [10, 100, 1000, 10000]) {
-    assert.ok(Math.abs(gamesToReach(blitz, expectedRating(blitz, g)) - g) < 1e-6);
+test('every supported time class has a baseline of the current shape', () => {
+  for (const tc of ['bullet', 'blitz', 'rapid', 'classical']) assert.ok(getBaseline('lichess', tc)?.curve.length);
+  for (const tc of ['bullet', 'blitz', 'rapid']) assert.ok(getBaseline('chesscom', tc)?.difficulty.length);
+});
+
+test('typical rating interpolates in log-games and clamps outside the curve', () => {
+  assert.equal(typicalRating(blitz, 300), 1500);
+  assert.ok(Math.abs(typicalRating(blitz, Math.sqrt(300 * 3000)) - 1600) < 1e-9);
+  assert.equal(typicalRating(blitz, 10), 1300);
+  assert.equal(typicalRating(blitz, 1e6), 1900);
+});
+
+test('ii is 1 at the typical rating, linear inside the band', () => {
+  const at = (r) => improvement(blitz, r, 3000).ii;
+  assert.ok(Math.abs(at(1700) - 1) < 1e-9);
+  assert.ok(Math.abs(at(1300) - 0.5) < 1e-9); // (1300-900)/(1700-900)
+  assert.ok(Math.abs(at(1700 + BAND) - (1700 + BAND - 900) / 800) < 1e-9);
+  assert.equal(at(800), 0, 'never negative');
+});
+
+test('ii is continuous and increasing, and Elo above the band weighs more', () => {
+  const at = (r) => improvement(blitz, r, 3000).ii;
+  let prev = -1;
+  for (let r = 900; r <= 3200; r += 10) {
+    const v = at(r);
+    assert.ok(v > prev, `increasing at ${r}`);
+    assert.ok(v - prev < 0.5 || prev < 0, `no jump at ${r}`);
+    prev = v;
   }
+  const step = (r) => at(r + 100) - at(r);
+  assert.ok(step(2400) > step(2000) && step(2000) > step(1300), 'higher Elo is worth more');
 });
 
-test('an exactly-average player has ii = 1', () => {
-  const games = 1000;
-  const r = computeIndicator({ rating: expectedRating(blitz, games), games, provisional: false }, blitz);
-  assert.equal(r.status, 'ok');
-  assert.ok(Math.abs(r.ii - 1) < 1e-9);
+test('more experience lowers ii for the same rating', () => {
+  assert.ok(improvement(blitz, 2000, 300).ii > improvement(blitz, 2000, 30000).ii);
 });
 
-test('reaching the average rating in half the games gives ii = 2', () => {
-  const rating = expectedRating(blitz, 2000);
-  const r = computeIndicator({ rating, games: 1000, provisional: false }, blitz);
-  assert.ok(Math.abs(r.ii - 2) < 1e-9);
+test('flags and expected score', () => {
+  assert.ok(improvement(blitz, 850, 3000).flags.belowStart);
+  assert.ok(improvement(blitz, 2600, 3000).flags.extrapolated);
+  assert.ok(improvement(blitz, 1700, 1e6).flags.beyondExperience);
+  assert.ok(Math.abs(expectedScore(1700, 1700) - 0.5) < 1e-12);
+  assert.ok(Math.abs(expectedScore(2100, 1700) - 10 / 11) < 1e-12);
+  assert.ok(difficulty(blitz, 2000) > difficulty(blitz, 1500));
 });
 
 test('too few games or provisional → insufficient', () => {
