@@ -5,12 +5,34 @@
 (() => {
   const BADGE_ID = 'cii-badge';
 
+  // Labels and colours modelled on chess.com's move classification.
+  // Thresholds chosen on the calibration sample: on Lichess roughly
+  // blunder 6% · mistake 13% · inaccuracy 19% · good 30% · excellent 17% ·
+  // best 11% · great 3% · brilliant 1%. Colours: change them here only.
+  const TIERS = [
+    { name: 'Blunder',    min: 0,    color: '#ca3431', text: '#fff' },
+    { name: 'Mistake',    min: 0.4,  color: '#e58f2a', text: '#fff' },
+    { name: 'Inaccuracy', min: 0.7,  color: '#f7c045', text: '#2b2b2b' },
+    { name: 'Good',       min: 0.9,  color: '#95af8a', text: '#fff' },
+    { name: 'Excellent',  min: 1.15, color: '#96bc4b', text: '#fff' },
+    { name: 'Best',       min: 1.4,  color: '#81b64c', text: '#fff' },
+    { name: 'Great',      min: 2,    color: '#5c8bb0', text: '#fff' },
+    { name: 'Brilliant',  min: 3,    color: '#1baca6', text: '#fff' },
+  ];
+
   function tier(ii) {
-    if (ii == null) return 'none';
-    if (ii < 0.75) return 'low';
-    if (ii < 1.25) return 'avg';
-    if (ii < 2) return 'good';
-    return 'great';
+    if (ii == null) return null;
+    return TIERS.filter((t) => ii >= t.min).at(-1);
+  }
+
+  function paint(node, t, { background }) {
+    if (!t) return;
+    if (background) {
+      node.style.background = t.color;
+      node.style.color = t.text;
+    } else {
+      node.style.color = t.color;
+    }
   }
 
   function fmt(ii, { approx = false, capped = false } = {}) {
@@ -20,12 +42,29 @@
     return `${approx ? '~' : ''}${ii.toFixed(2)}x`;
   }
 
+  // 8394 → "8.4k", 950 → "950"
+  function kGames(n) {
+    return n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(Math.round(n));
+  }
+
+  function pct(p) {
+    if (p > 0.99) return '>99%';
+    if (p < 0.01) return '<1%';
+    return `~${Math.round(p * 100)}%`;
+  }
+
+  // "other TCs: bullet 1965 × 0.3 + rapid 1918 × 0.05" (linked account marked)
+  function effortText(parts) {
+    const other = (p) => (p.linked ? ' (other site)' : '');
+    return 'counted: ' + parts
+      .map((p) => `${p.timeClass}${other(p)} ${p.games}` + (p.weight === 1 ? '' : ` × ${p.weight}`))
+      .join(' + ');
+  }
+
   // Short explanations shown under a time class when needed.
   function notes(c) {
     const out = [];
     if (c.flags?.belowStart) out.push('below the typical beginner level');
-    if (c.flags?.extrapolated) out.push('very rare rating – the value is an estimate');
-    if (c.flags?.beyondExperience) out.push('more games than anyone in our sample – compared with the most experienced players');
     if (c.capped) out.push('capped at 20x');
     return out;
   }
@@ -43,22 +82,29 @@
       const row = el('div', 'cii-row');
       row.append(
         el('span', 'cii-tc', c.timeClass),
-        el(
-          'span',
-          `cii-val cii-${tier(c.ii)}`,
-          c.status === 'ok' ? fmt(c.ii, { approx: c.flags.extrapolated, capped: c.capped }) : 'n/a',
-        ),
+        (() => {
+          const v = el('span', 'cii-val', c.status === 'ok' ? fmt(c.ii, { approx: c.flags.extrapolated || c.flags.beyondExperience, capped: c.capped }) : 'n/a');
+          if (c.status === 'ok') {
+            paint(v, tier(c.ii), { background: false });
+            v.title =
+              `Players with ~${kGames(c.effectiveGames)} games here are usually rated ~${Math.round(c.typical)}` +
+              `${c.flags.beyondExperience ? ' (extrapolated – more games than anyone in our sample)' : ''}. ` +
+              `Against them you would score ${pct(c.expectedScore)}.`;
+            v.style.cursor = 'help';
+          }
+          return v;
+        })(),
         el(
           'span',
           'cii-meta',
           c.status === 'ok'
             ? `${c.rating} · ${c.games} games` +
-                (c.effectiveGames > c.games ? ` (+${Math.round(c.effectiveGames - c.games)} other TCs)` : '') +
-                ` · typical ${Math.round(c.typical)} · scores ~${Math.round(c.expectedScore * 100)}% vs typical`
+                (c.effectiveGames > c.games ? ` (+${Math.round(c.effectiveGames - c.games)} weighted from other TCs)` : '')
             : `${c.rating} · ${c.games} games · needs ≥30 non-provisional games`,
         ),
       );
       box.append(row);
+      if (c.status === 'ok' && c.effortParts?.length) box.append(el('div', 'cii-note', effortText(c.effortParts)));
       for (const n of c.status === 'ok' ? notes(c) : []) box.append(el('div', 'cii-note', n));
     }
     const pt = report.playtime;
@@ -76,8 +122,18 @@
         ),
       );
     }
+    const legend = el('div', 'cii-legend');
+    for (const [i, t] of TIERS.entries()) {
+      const next = TIERS[i + 1];
+      const chip = el('span', 'cii-chip', i === 0 ? `<${next.min}x` : next ? `${t.min}–${next.min}x` : `≥${t.min}x`);
+      paint(chip, t, { background: true });
+      legend.append(chip);
+    }
+    const approx = report.classes.some((c) => c.status === 'ok' && (c.flags.extrapolated || c.flags.beyondExperience));
     box.append(
-      el('div', 'cii-foot', 'ii: how far you climbed vs. a typical player with the same experience (1.00x = typical)'),
+      legend,
+      ...(approx ? [el('div', 'cii-foot', '~ estimate: rating rarer, or more games, than anyone in our sample')] : []),
+      el('div', 'cii-foot', 'ii: how far you climbed vs. the median player with the same experience on this site (1.00x = typical). Hover a value for details.'),
       el('div', 'cii-foot', `${Math.round(pt.hours)}h playtime${pt.estimated ? ' (estimated)' : ''}`),
       el('div', 'cii-foot', `baseline: ${report.baselineVersion}`),
     );
@@ -100,18 +156,25 @@
     return badge;
   }
 
-  function setContent(badge, label, cls, title) {
+  function setContent(badge, label, cls, title, t = null) {
     badge.replaceChildren();
     badge.className = `cii-badge ${cls}${badge.classList.contains('cii-floating') ? ' cii-floating' : ''}`;
+    badge.style.background = '';
+    badge.style.color = '';
     badge.append(el('span', 'cii-label', 'ii'), el('span', 'cii-main', label));
+    if (t) paint(badge, t, { background: true });
     badge.title = title ?? '';
   }
 
   function renderLoading(anchor) {
+    closeDetails();
+    currentReport = null;
     setContent(getOrCreateBadge(anchor), '…', 'cii-loading', 'Improvement indicator: loading');
   }
 
   function renderError(anchor, error) {
+    closeDetails();
+    currentReport = null;
     const msg = { not_found: 'user not found', rate_limited: 'rate limited, try later', closed: 'account closed' }[error] ?? 'error';
     setContent(getOrCreateBadge(anchor), '!', 'cii-error', `Improvement indicator: ${msg}`);
   }
@@ -119,23 +182,79 @@
   function renderReport(anchor, report) {
     const badge = getOrCreateBadge(anchor);
     const hasData = report.overall != null;
-    const approx = report.classes.some((c) => c.status === 'ok' && c.flags.extrapolated);
+    const approx = report.classes.some((c) => c.status === 'ok' && (c.flags.extrapolated || c.flags.beyondExperience));
+    const t = tier(report.overall);
     setContent(
       badge,
       hasData ? fmt(report.overall, { approx }) : 'n/a',
-      `cii-${tier(report.overall)}`,
-      hasData ? 'Improvement vs. average player (click for details)' : 'Not enough rated games yet',
+      hasData ? '' : 'cii-none',
+      hasData ? 'Improvement vs. players with the same experience (click for details)' : 'Not enough rated games yet',
+      t,
     );
-    const details = buildDetails(report);
-    details.hidden = true;
-    badge.append(details);
-    badge.onclick = (e) => {
-      e.stopPropagation();
-      details.hidden = !details.hidden;
-    };
+    closeDetails();
+    currentReport = report;
+    if (!badge.dataset.ciiBound) {
+      // capture phase + preventDefault: works even if the site wraps the
+      // badge in a link or handles clicks on the profile header itself
+      badge.addEventListener('click', onBadgeClick, true);
+      badge.dataset.ciiBound = '1';
+    }
+  }
+
+  // --- details popover --------------------------------------------------
+  // Lives directly on <body> with position: fixed, so no site container
+  // (overflow: hidden, transforms, stacking contexts) can clip or hide it.
+  const DETAILS_ID = 'cii-details';
+  let currentReport = null;
+
+  function onBadgeClick(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (document.getElementById(DETAILS_ID)) closeDetails();
+    else if (currentReport) openDetails(e.currentTarget, currentReport);
+  }
+
+  function openDetails(badge, report) {
+    const box = buildDetails(report);
+    box.id = DETAILS_ID;
+    box.style.visibility = 'hidden';
+    document.body.append(box);
+    positionDetails(badge, box);
+    box.style.visibility = '';
+    box.addEventListener('click', (e) => e.stopPropagation());
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('scroll', closeDetails, { passive: true, capture: true });
+    window.addEventListener('resize', closeDetails);
+    // deferred so the click that opened the panel doesn't close it again
+    setTimeout(() => document.addEventListener('click', closeDetails));
+  }
+
+  function positionDetails(badge, box) {
+    const r = badge.getBoundingClientRect();
+    const w = box.offsetWidth;
+    const h = box.offsetHeight;
+    const left = Math.min(Math.max(8, r.left), window.innerWidth - w - 8);
+    const below = r.bottom + 6;
+    const top = below + h <= window.innerHeight - 8 ? below : Math.max(8, r.top - h - 6);
+    box.style.left = `${left}px`;
+    box.style.top = `${top}px`;
+  }
+
+  function onKey(e) {
+    if (e.key === 'Escape') closeDetails();
+  }
+
+  function closeDetails() {
+    document.getElementById(DETAILS_ID)?.remove();
+    document.removeEventListener('click', closeDetails);
+    document.removeEventListener('keydown', onKey);
+    window.removeEventListener('scroll', closeDetails, { capture: true });
+    window.removeEventListener('resize', closeDetails);
   }
 
   function removeBadge() {
+    closeDetails();
+    currentReport = null;
     document.getElementById(BADGE_ID)?.remove();
   }
 

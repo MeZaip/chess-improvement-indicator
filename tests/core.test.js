@@ -32,7 +32,9 @@ test('typical rating interpolates in log-games and clamps outside the curve', ()
   assert.equal(typicalRating(blitz, 300), 1500);
   assert.ok(Math.abs(typicalRating(blitz, Math.sqrt(300 * 3000)) - 1600) < 1e-9);
   assert.equal(typicalRating(blitz, 10), 1300);
-  assert.equal(typicalRating(blitz, 1e6), 1900);
+  // past the last point the upper trend continues (≈ 200 per ×10 games here)
+  const far = typicalRating(blitz, 300000);
+  assert.ok(far > 1900 && Math.abs(far - 2100) < 20, `extrapolated ${far}`);
 });
 
 test('ii is 1 at the typical rating, linear inside the band', () => {

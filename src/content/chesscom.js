@@ -6,9 +6,10 @@ CII.run({
     return m ? m[1] : null;
   },
   // chess.com markup changes often; if none matches, the badge floats.
+  // Checked Nov 2026: the row with title · username · flag. Not the username
+  // element itself – it (and its parent) have overflow: hidden.
   anchorSelectors: [
-    '.profile-card-username',
-    '.profile-header-info',
-    '.cc-user-username-component',
+    '.profile-header-user-info .profile-card-user-block',
+    '.profile-header-user-info',
   ],
 });

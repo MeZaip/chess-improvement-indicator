@@ -13,7 +13,7 @@ const PROVIDERS = {
 };
 
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
-const CACHE_VERSION = 2; // bump when the report shape changes (baseline changes are automatic)
+const CACHE_VERSION = 3; // bump when the report shape changes (baseline changes are automatic)
 
 /**
  * Find the same person on the other platform (see core/linking.js).

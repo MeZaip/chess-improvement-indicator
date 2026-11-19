@@ -1,5 +1,5 @@
 import { BASELINE_VERSION, getBaseline } from './baseline.js';
-import { effectiveGames } from './effort.js';
+import { effectiveGames, effortParts } from './effort.js';
 import { combineIndicators, computeIndicator } from './indicator.js';
 import { AVG_GAME_SECONDS, TIME_CLASSES, estimatePlaytimeSeconds } from './timeClasses.js';
 
@@ -31,6 +31,7 @@ export function buildReport(player, linked = null) {
       rating: perf.rating,
       games: perf.games,
       effectiveGames: effort,
+      effortParts: effortParts(player.perfs, tc, baseline.transfer, linkedPerfs),
       weight: perf.games * AVG_GAME_SECONDS[tc],
       ...computeIndicator(perf, baseline, effort),
     });

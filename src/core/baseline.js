@@ -43,10 +43,31 @@ function interp(knots, x) {
   return x2 === x1 ? y1 : y1 + ((x - x1) / (x2 - x1)) * (y2 - y1);
 }
 
-/** Median rating of players with `games` effective games (interpolated in log-games, clamped). */
+/**
+ * Rating gained per e-fold of games over the upper half of the curve
+ * (weighted least squares on [ln games, rating]); used to continue the
+ * curve past the most experienced players in the sample instead of
+ * freezing it there. Never negative.
+ */
+function upperSlope(curve) {
+  const pts = curve.slice(Math.floor(curve.length / 2)).map(([g, r]) => [Math.log(g), r]);
+  if (pts.length < 2) return 0;
+  const mx = pts.reduce((a, [x]) => a + x, 0) / pts.length;
+  const my = pts.reduce((a, [, y]) => a + y, 0) / pts.length;
+  let sxy = 0, sxx = 0;
+  for (const [x, y] of pts) { sxy += (x - mx) * (y - my); sxx += (x - mx) ** 2; }
+  return sxx > 0 ? Math.max(sxy / sxx, 0) : 0;
+}
+
+/**
+ * Median rating of players with `games` effective games: interpolated in
+ * log-games inside the data; below it clamped to the first point; above it
+ * the upper trend is continued (flagged as beyondExperience by improvement()).
+ */
 export function typicalRating({ curve }, games) {
   if (games <= curve[0][0]) return curve[0][1];
-  if (games >= curve[curve.length - 1][0]) return curve[curve.length - 1][1];
+  const [gLast, rLast] = curve[curve.length - 1];
+  if (games >= gLast) return rLast + upperSlope(curve) * Math.log(games / gLast);
   return interp(curve.map(([g, r]) => [Math.log(g), r]), Math.log(games));
 }
 

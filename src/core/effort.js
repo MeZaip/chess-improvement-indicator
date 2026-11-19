@@ -38,3 +38,20 @@ export function effectiveGames(perfs, timeClass, transfer = defaultTransfer(time
   }
   return total;
 }
+
+/**
+ * What the extra (non-own) effective games are made of, for display:
+ * [{ timeClass, games, weight, linked }] – only non-zero contributions.
+ * Sum of games × weight over the parts = effectiveGames − own games.
+ */
+export function effortParts(perfs, timeClass, transfer = defaultTransfer(timeClass), linkedPerfs = null) {
+  const g = (ps, t) => ps?.[t]?.games ?? 0;
+  const parts = [];
+  if (g(linkedPerfs, timeClass) > 0) parts.push({ timeClass, games: g(linkedPerfs, timeClass), weight: 1, linked: true });
+  for (const [t, w] of Object.entries(transfer)) {
+    if (t === timeClass || w <= 0) continue;
+    if (g(perfs, t) > 0) parts.push({ timeClass: t, games: g(perfs, t), weight: w, linked: false });
+    if (g(linkedPerfs, t) > 0) parts.push({ timeClass: t, games: g(linkedPerfs, t), weight: w, linked: true });
+  }
+  return parts;
+}

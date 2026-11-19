@@ -55,3 +55,16 @@ test('fitTransfer recovers which time classes matter', () => {
   assert.ok(fit.r2 > fit.r2Own);
   assert.equal(fitTransfer(samples.slice(0, 100), 'rapid', TCS), null);
 });
+
+test('effortParts explains the extra effective games', async () => {
+  const { effortParts } = await import('../src/core/effort.js');
+  const perfs = { bullet: { games: 1965 }, blitz: { games: 7709 }, rapid: { games: 1918 } };
+  const transfer = { bullet: 0.3, rapid: 0.05, classical: 0 };
+  const parts = effortParts(perfs, 'blitz', transfer);
+  assert.deepEqual(parts.map((p) => [p.timeClass, p.games, p.weight]), [['bullet', 1965, 0.3], ['rapid', 1918, 0.05]]);
+  const extra = parts.reduce((s, p) => s + p.games * p.weight, 0);
+  assert.ok(Math.abs(extra - (effectiveGames(perfs, 'blitz', transfer) - 7709)) < 1e-9);
+  assert.equal(Math.round(extra), 685);
+  const linked = effortParts(perfs, 'blitz', transfer, { blitz: { games: 50 }, bullet: { games: 10 } });
+  assert.ok(linked.some((p) => p.linked && p.timeClass === 'blitz' && p.weight === 1));
+});
