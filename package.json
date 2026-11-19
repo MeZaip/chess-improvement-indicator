@@ -1,0 +1,10 @@
+{
+  "name": "chess-improvement-indicator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Chrome extension: improvement indicator (ii) on lichess.org and chess.com profiles",
+  "scripts": {
+    "test": "node --test \"tests/**/*.test.js\""
+  }
+}

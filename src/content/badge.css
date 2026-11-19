@@ -1,0 +1,59 @@
+.cii-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  margin-left: 0.6em;
+  padding: 0.15em 0.55em;
+  border-radius: 999px;
+  font: 600 14px/1.4 system-ui, sans-serif;
+  vertical-align: middle;
+  cursor: pointer;
+  user-select: none;
+  background: #3a3a3a;
+  color: #eee;
+  z-index: 50;
+}
+.cii-badge .cii-label { opacity: 0.7; font-weight: 500; }
+
+.cii-floating {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  margin: 0;
+  z-index: 9999;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.cii-badge.cii-low   { background: #5c2b2b; }
+.cii-badge.cii-avg   { background: #3a3a3a; }
+.cii-badge.cii-good  { background: #2e5a2e; }
+.cii-badge.cii-great { background: #7a5c12; }
+.cii-badge.cii-error { background: #5c2b2b; }
+.cii-badge.cii-loading { opacity: 0.7; }
+
+.cii-details {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 260px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #222;
+  color: #ddd;
+  font-weight: 400;
+  font-size: 13px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  cursor: default;
+}
+.cii-floating .cii-details { top: auto; bottom: calc(100% + 6px); left: auto; right: 0; }
+.cii-details[hidden] { display: none; }
+
+.cii-row { display: grid; grid-template-columns: 70px 56px 1fr; gap: 6px; padding: 2px 0; }
+.cii-tc { text-transform: capitalize; }
+.cii-val { font-weight: 600; }
+.cii-val.cii-low   { color: #e57373; }
+.cii-val.cii-good  { color: #81c784; }
+.cii-val.cii-great { color: #ffd54f; }
+.cii-meta { opacity: 0.7; white-space: nowrap; }
+.cii-foot { margin-top: 4px; opacity: 0.55; font-size: 11px; }

@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Chess Improvement Indicator",
+  "version": "0.1.0",
+  "description": "Shows an improvement indicator (ii) on lichess.org and chess.com profiles: how fast a player reached their rating compared to the average player.",
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://lichess.org/*",
+    "https://api.chess.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://lichess.org/*"],
+      "js": ["src/content/badge.js", "src/content/lichess.js"],
+      "css": ["src/content/badge.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.chess.com/*"],
+      "js": ["src/content/badge.js", "src/content/chesscom.js"],
+      "css": ["src/content/badge.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
