@@ -15,6 +15,7 @@
   z-index: 50;
 }
 .cii-badge .cii-label { opacity: 0.7; font-weight: 500; }
+h1 > .cii-badge { text-transform: none; letter-spacing: normal; flex: none; }
 
 .cii-floating {
   position: fixed;
@@ -53,3 +54,10 @@
 .cii-link { margin-top: 6px; font-size: 12px; color: #81c784; }
 .cii-link-possible { color: #bbb; }
 .cii-foot { margin-top: 4px; opacity: 0.55; font-size: 11px; }
+.cii-refresh {
+  all: unset;
+  cursor: pointer;
+  color: #8ab4f8;
+  font-size: 11px;
+}
+.cii-refresh:hover { text-decoration: underline; }

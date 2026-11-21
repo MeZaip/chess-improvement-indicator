@@ -2,15 +2,19 @@ import { checkResponse } from './errors.js';
 
 // https://www.chess.com/news/view/published-data-api#pubapi-endpoint-player-stats
 // Note: chess.com refreshes these endpoints at most once every ~24h.
-export async function fetchChesscomPlayer(username) {
-  const res = await fetch(`https://api.chess.com/pub/player/${encodeURIComponent(username.toLowerCase())}/stats`);
+// Note: chess.com serves these from a CDN and refreshes them at most every
+// 12–24 h, so a fresh request can still return slightly old ratings.
+export async function fetchChesscomPlayer(username, { fresh = false } = {}) {
+  const res = await fetch(`https://api.chess.com/pub/player/${encodeURIComponent(username.toLowerCase())}/stats`, {
+    cache: fresh ? 'no-cache' : 'default',
+  });
   return normalizeChesscom(username, await checkResponse(res).json());
 }
 
 /** Like fetchChesscomPlayer, but returns null instead of throwing (for optional lookups). */
-export async function tryFetchChesscomPlayer(username) {
+export async function tryFetchChesscomPlayer(username, opts) {
   try {
-    return await fetchChesscomPlayer(username);
+    return await fetchChesscomPlayer(username, opts);
   } catch {
     return null;
   }

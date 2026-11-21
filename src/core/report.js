@@ -33,7 +33,7 @@ export function buildReport(player, linked = null) {
       effectiveGames: effort,
       effortParts: effortParts(player.perfs, tc, baseline.transfer, linkedPerfs),
       weight: perf.games * AVG_GAME_SECONDS[tc],
-      ...computeIndicator(perf, baseline, effort),
+      ...computeIndicator(perf, baseline, effort, { linked: linkedPerfs != null }),
     });
   }
 

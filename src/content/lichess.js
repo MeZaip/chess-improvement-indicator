@@ -6,9 +6,12 @@ CII.run({
     return m ? m[1] : null;
   },
   // Most specific first. If none matches, the badge floats bottom-right.
+  // The username heading first, so the badge sits right after the name
+  // (the header row itself spreads its items to the far ends).
   anchorSelectors: [
+    '.user-show .user-show__header h1',
+    '.user-show .box__top h1',
     '.user-show .user-show__header',
-    '.user-show .box__top',
     '.user-show',
   ],
 });

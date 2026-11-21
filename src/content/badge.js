@@ -53,12 +53,13 @@
     return `~${Math.round(p * 100)}%`;
   }
 
-  // "other TCs: bullet 1965 × 0.3 + rapid 1918 × 0.05" (linked account marked)
-  function effortText(parts) {
-    const other = (p) => (p.linked ? ' (other site)' : '');
-    return 'counted: ' + parts
-      .map((p) => `${p.timeClass}${other(p)} ${p.games}` + (p.weight === 1 ? '' : ` × ${p.weight}`))
-      .join(' + ');
+  // "counted: bullet 1965 × 0.3 + 1371 imported from chess.com"
+  function effortText(parts, otherSite) {
+    const own = parts.filter((p) => !p.linked)
+      .map((p) => `${p.timeClass} ${p.games}` + (p.weight === 1 ? '' : ` × ${p.weight}`));
+    const imported = Math.round(parts.filter((p) => p.linked).reduce((s, p) => s + p.games * p.weight, 0));
+    if (imported > 0) own.push(`${imported} imported from ${otherSite}`);
+    return 'counted: ' + own.join(' + ');
   }
 
   // Short explanations shown under a time class when needed.
@@ -100,11 +101,17 @@
           c.status === 'ok'
             ? `${c.rating} · ${c.games} games` +
                 (c.effectiveGames > c.games ? ` (+${Math.round(c.effectiveGames - c.games)} weighted from other TCs)` : '')
-            : `${c.rating} · ${c.games} games · needs ≥30 non-provisional games`,
+            : `${c.rating} · ${c.games} games · ` +
+                (c.reason === 'provisional'
+                  ? 'rating still provisional on this site'
+                  : `only ${c.games} games here (needs ${c.minGames})`),
         ),
       );
       box.append(row);
-      if (c.status === 'ok' && c.effortParts?.length) box.append(el('div', 'cii-note', effortText(c.effortParts)));
+      if (c.status === 'ok' && c.effortParts?.length) {
+        const otherSite = report.linked?.platform === 'lichess' ? 'Lichess' : 'chess.com';
+        box.append(el('div', 'cii-note', effortText(c.effortParts, otherSite)));
+      }
       for (const n of c.status === 'ok' ? notes(c) : []) box.append(el('div', 'cii-note', n));
     }
     const pt = report.playtime;
@@ -116,7 +123,7 @@
           'div',
           ln.counted ? 'cii-link' : 'cii-link cii-link-possible',
           ln.counted
-            ? `✓ includes ${ln.games} games from ${site}/${ln.username} (linked in Lichess profile)`
+            ? `✓ games imported from ${site}/${ln.username}`
             : `? ${site}/${ln.username} has the same name (${ln.games} games) – not counted: ` +
                 'add the chess.com profile link to the Lichess profile to merge',
         ),
@@ -135,6 +142,22 @@
       ...(approx ? [el('div', 'cii-foot', '~ estimate: rating rarer, or more games, than anyone in our sample')] : []),
       el('div', 'cii-foot', 'ii: how far you climbed vs. the median player with the same experience on this site (1.00x = typical). Hover a value for details.'),
       el('div', 'cii-foot', `${Math.round(pt.hours)}h playtime${pt.estimated ? ' (estimated)' : ''}`),
+      (() => {
+        const line = el('div', 'cii-foot cii-refresh-line', `updated ${ago(report.fetchedAt)} · `);
+        const btn = el('button', 'cii-refresh', '↻ refresh');
+        btn.type = 'button';
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          closeDetails();
+          refreshCurrent?.();
+        });
+        line.append(btn);
+        if (report.platform === 'chesscom') {
+          line.append(el('span', null, ' · chess.com public data can lag a few hours behind'));
+        }
+        return line;
+      })(),
       el('div', 'cii-foot', `baseline: ${report.baselineVersion}`),
     );
     return box;
@@ -258,8 +281,19 @@
     document.getElementById(BADGE_ID)?.remove();
   }
 
-  function requestReport(platform, username) {
-    return chrome.runtime.sendMessage({ type: 'getReport', platform, username });
+  function requestReport(platform, username, force = false) {
+    return chrome.runtime.sendMessage({ type: 'getReport', platform, username, force });
+  }
+
+  // set by run(): reloads the current profile bypassing all caches
+  let refreshCurrent = null;
+
+  function ago(ts) {
+    if (!ts) return '';
+    const min = Math.round((Date.now() - ts) / 60000);
+    if (min < 1) return 'just now';
+    if (min < 60) return `${min} min ago`;
+    return `${Math.round(min / 60)} h ago`;
   }
 
   /** Find the first selector that matches, waiting up to `timeoutMs` (SPAs render late). */
@@ -285,9 +319,9 @@
   function run({ platform, getUsername, anchorSelectors }) {
     let current = null;
 
-    async function update() {
+    async function update(force = false) {
       const username = getUsername(location);
-      if (username === current) return;
+      if (username === current && !force) return;
       current = username;
       if (!username) return removeBadge();
 
@@ -295,7 +329,7 @@
       if (current !== username) return; // navigated away meanwhile
       renderLoading(anchor);
       try {
-        const res = await requestReport(platform, username);
+        const res = await requestReport(platform, username, force);
         if (current !== username) return;
         res.ok ? renderReport(anchor, res.report) : renderError(anchor, res.error);
       } catch (e) {
@@ -303,6 +337,7 @@
       }
     }
 
+    refreshCurrent = () => update(true);
     update();
     // Both sites do client-side navigation; polling the URL is the simplest
     // robust way to notice it from an isolated content script.

@@ -95,3 +95,24 @@ test('tools/link: failed lookups stay unchecked so a re-run retries them', async
   assert.equal(li[0].linkCheckedAt, undefined);
   assert.deepEqual(li[0].chesscomLinks, ['y00'], 'profile data is kept for the next run');
 });
+
+test('a confirmed linked account lowers the minimum games on this site', () => {
+  const player = { platform: 'lichess', username: 'p', playTimeSeconds: null, perfs: { rapid: { rating: 1519, games: 23, provisional: false } } };
+  const other = { platform: 'chesscom', username: 'p', perfs: { rapid: { rating: 900, games: 1345, provisional: false } } };
+  const rapid = (r) => r.classes.find((c) => c.timeClass === 'rapid');
+
+  const alone = rapid(buildReport(player));
+  assert.equal(alone.status, 'insufficient');
+  assert.equal(alone.reason, 'few_games');
+  assert.equal(alone.minGames, 30);
+
+  const possible = rapid(buildReport(player, { ...other, status: 'possible' }));
+  assert.equal(possible.status, 'insufficient', 'unconfirmed accounts change nothing');
+
+  const linked = rapid(buildReport(player, { ...other, status: 'confirmed' }));
+  assert.equal(linked.status, 'ok');
+  assert.equal(linked.effectiveGames, 23 + 1345);
+
+  const prov = rapid(buildReport({ ...player, perfs: { rapid: { rating: 1519, games: 23, provisional: true } } }, { ...other, status: 'confirmed' }));
+  assert.equal(prov.reason, 'provisional');
+});
