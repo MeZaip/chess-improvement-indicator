@@ -57,3 +57,24 @@ export function buildReport(player, linked = null) {
     },
   };
 }
+
+/**
+ * Replace API ratings with the ones currently shown on the profile page
+ * (Chess.com's public API can lag hours behind). Only time classes the
+ * player already has, and only plausible values, are used; game counts stay
+ * from the API. Returns a new player object and whether anything was applied.
+ *
+ * @param {{perfs:Record<string,{rating:number}>}} player
+ * @param {Record<string, number>|null} pageRatings  e.g. { blitz: 1205 }
+ */
+export function applyPageRatings(player, pageRatings) {
+  if (!pageRatings) return { player, applied: false };
+  const perfs = { ...player.perfs };
+  let applied = false;
+  for (const [tc, rating] of Object.entries(pageRatings)) {
+    if (!perfs[tc] || !Number.isInteger(rating) || rating < 100 || rating > 3500) continue;
+    if (perfs[tc].rating !== rating) applied = true;
+    perfs[tc] = { ...perfs[tc], rating };
+  }
+  return { player: { ...player, perfs }, applied };
+}

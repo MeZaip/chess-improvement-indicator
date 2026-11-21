@@ -176,3 +176,7 @@ tests/                   node:test, no network needed
 - If a site changes its markup and no anchor selector matches, the badge
   falls back to floating in the bottom-right corner — update the selectors
   in `src/content/<site>.js`.
+
+## License
+
+Apache License 2.0 – see [LICENSE](LICENSE).

@@ -3,7 +3,7 @@
 // {ok:true, report} or {ok:false, error}.
 
 import { BASELINE_VERSION } from './core/baseline.js';
-import { buildReport } from './core/report.js';
+import { applyPageRatings, buildReport } from './core/report.js';
 import { fetchChesscomPlayer, tryFetchChesscomPlayer } from './providers/chesscom.js';
 import { fetchLichessPlayer, tryFetchLichessPlayer } from './providers/lichess.js';
 
@@ -13,7 +13,7 @@ const PROVIDERS = {
 };
 
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 min; the panel has a refresh button too
-const CACHE_VERSION = 5; // bump when the report shape changes (baseline changes are automatic)
+const CACHE_VERSION = 6; // bump when the report shape changes (baseline changes are automatic)
 
 /**
  * Find the same person on the other platform (see core/linking.js).
@@ -56,28 +56,42 @@ async function purgeCache() {
   if (stale.length) await chrome.storage.local.remove(stale);
 }
 
-async function getReport(platform, username, { force = false } = {}) {
+async function getReport(platform, username, { force = false, pageRatings = null } = {}) {
   purgeCache().catch(() => {});
   const key = `report:v${CACHE_VERSION}:${BASELINE_VERSION}:${platform}:${username.toLowerCase()}`;
+
+  // The cache keeps the raw public data; the report is rebuilt on every
+  // request so ratings read from the page are always applied.
+  let entry = null;
   if (!force) {
     const cached = (await chrome.storage.local.get(key))[key];
-    if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.report;
+    if (cached && Date.now() - cached.at < CACHE_TTL_MS) entry = cached;
+  }
+  if (!entry) {
+    const fetchPlayer = PROVIDERS[platform];
+    if (!fetchPlayer) throw new Error(`unknown platform ${platform}`);
+    const opts = { fresh: force };
+    const player = await fetchPlayer(username, opts);
+    const linked = await findLinkedAccount(player, opts);
+    entry = { at: Date.now(), player, linked };
+    await chrome.storage.local.set({ [key]: entry });
   }
 
-  const fetchPlayer = PROVIDERS[platform];
-  if (!fetchPlayer) throw new Error(`unknown platform ${platform}`);
+  const { player, applied } = applyPageRatings(entry.player, pageRatings);
+  return { ...buildReport(player, entry.linked), fetchedAt: entry.at, ratingsFromPage: applied };
+}
 
-  const opts = { fresh: force };
-  const player = await fetchPlayer(username, opts);
-  const linked = await findLinkedAccount(player, opts);
-  const report = { ...buildReport(player, linked), fetchedAt: Date.now() };
-  await chrome.storage.local.set({ [key]: { at: report.fetchedAt, report } });
-  return report;
+// Content scripts send what the page shows; accept only small integers per known time class.
+function sanitizeRatings(r) {
+  if (!r || typeof r !== 'object') return null;
+  const out = {};
+  for (const tc of ['bullet', 'blitz', 'rapid', 'classical']) if (Number.isInteger(r[tc])) out[tc] = r[tc];
+  return Object.keys(out).length ? out : null;
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type !== 'getReport') return false;
-  getReport(msg.platform, msg.username, { force: Boolean(msg.force) })
+  getReport(msg.platform, msg.username, { force: Boolean(msg.force), pageRatings: sanitizeRatings(msg.pageRatings) })
     .then((report) => sendResponse({ ok: true, report }))
     .catch((err) => sendResponse({ ok: false, error: err.code ?? err.message }));
   return true; // keep the channel open for the async response

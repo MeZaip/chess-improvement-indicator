@@ -71,3 +71,24 @@ test('end to end: ii over the synthetic population is centred on 1', () => {
 test('too little data → null', () => {
   assert.equal(fitTypicalCurve(synthetic(100), { minGames: 30 }), null);
 });
+
+test('weighted quantile, weighted difficulty and activity weights', async () => {
+  const { weightedQuantile } = await import('../tools/lib/fit.js');
+  const { activityWeights } = await import('../tools/lib/weights.js');
+  assert.equal(weightedQuantile([{ v: 1 }, { v: 2 }, { v: 3 }], 0.5), 2);
+  assert.equal(weightedQuantile([{ v: 1, w: 10 }, { v: 2, w: 1 }, { v: 3, w: 1 }], 0.5), 1);
+
+  // two equal-size groups; weighting the low group up makes high ratings rarer
+  const ratings = [...Array(500).fill(1200), ...Array(500).fill(2000)];
+  const plain = fitDifficulty(ratings);
+  const weighted = fitDifficulty(ratings, { weights: ratings.map((r) => (r === 1200 ? 4 : 1)) });
+  const at = (k, r) => difficulty({ difficulty: k.knots }, r);
+  assert.ok(at(weighted, 1800) > at(plain, 1800));
+
+  const now = Date.parse('2026-11-20T00:00:00Z');
+  const mk = (games, ageDays) => ({ perfs: { blitz: { games } }, createdAt: now - ageDays * 864e5, collectedAt: new Date(now).toISOString() });
+  const grinder = mk(36500, 365), casual = mk(365, 365), noData = { perfs: { blitz: { games: 10 } } };
+  const w = activityWeights([grinder, casual, ...Array(20).fill(0).map((_, i) => mk(365 * (i + 1), 365)), noData]);
+  assert.ok(w(casual) > w(grinder) * 10, 'rare players count more');
+  assert.ok(w(noData) > 0);
+});

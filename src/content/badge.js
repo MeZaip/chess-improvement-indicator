@@ -4,6 +4,7 @@
 
 (() => {
   const BADGE_ID = 'cii-badge';
+  const HELP_URL = 'https://mezaip.github.io/chess-improvement-indicator/how-it-works';
 
   // Labels and colours modelled on chess.com's move classification.
   // Thresholds chosen on the calibration sample: on Lichess roughly
@@ -154,11 +155,21 @@
         });
         line.append(btn);
         if (report.platform === 'chesscom') {
-          line.append(el('span', null, ' · chess.com public data can lag a few hours behind'));
+          line.append(el('span', null, report.ratingsFromPage
+            ? ' · ratings as shown on this page'
+            : ' · chess.com public data can lag a few hours behind'));
         }
         return line;
       })(),
-      el('div', 'cii-foot', `baseline: ${report.baselineVersion}`),
+      (() => {
+        const line = el('div', 'cii-foot', `baseline: ${report.baselineVersion} · `);
+        const a = el('a', 'cii-help', 'How is this calculated?');
+        a.href = HELP_URL;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        line.append(a);
+        return line;
+      })(),
     );
     return box;
   }
@@ -281,8 +292,8 @@
     document.getElementById(BADGE_ID)?.remove();
   }
 
-  function requestReport(platform, username, force = false) {
-    return chrome.runtime.sendMessage({ type: 'getReport', platform, username, force });
+  function requestReport(platform, username, force = false, pageRatings = null) {
+    return chrome.runtime.sendMessage({ type: 'getReport', platform, username, force, pageRatings });
   }
 
   // set by run(): reloads the current profile bypassing all caches
@@ -316,7 +327,7 @@
    * fetch the report and render it next to the first matching anchor
    * (or as a floating badge if the site layout changed).
    */
-  function run({ platform, getUsername, anchorSelectors }) {
+  function run({ platform, getUsername, anchorSelectors, getPageRatings = null }) {
     let current = null;
 
     async function update(force = false) {
@@ -329,7 +340,9 @@
       if (current !== username) return; // navigated away meanwhile
       renderLoading(anchor);
       try {
-        const res = await requestReport(platform, username, force);
+        const pageRatings = getPageRatings ? await getPageRatings(username).catch(() => null) : null;
+        if (current !== username) return;
+        const res = await requestReport(platform, username, force, pageRatings);
         if (current !== username) return;
         res.ok ? renderReport(anchor, res.report) : renderError(anchor, res.error);
       } catch (e) {
@@ -344,5 +357,5 @@
     setInterval(update, 1000);
   }
 
-  globalThis.CII = { run };
+  globalThis.CII = { run, waitForAny };
 })();

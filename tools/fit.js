@@ -21,6 +21,7 @@ import { defaultTransfer, effectiveGames } from '../src/core/effort.js';
 import { MIN_GAMES } from '../src/core/indicator.js';
 import { TIME_CLASSES } from '../src/core/timeClasses.js';
 import { fitDifficulty, fitTransfer, fitTypicalCurve, quantile } from './lib/fit.js';
+import { activityWeights } from './lib/weights.js';
 
 const { values } = parseArgs({
   options: {
@@ -63,6 +64,11 @@ for (const [platform, tcs] of Object.entries(PLATFORM_TCS)) {
     continue;
   }
   console.log(`\n${platform}: ${samples.length} random players used (${all.length - samples.length} leaderboard/titled ignored)`);
+  // Lichess players were found through recent games → frequent players are
+  // over-represented; correct with inverse play-rate weights. Chess.com
+  // players are random accounts → no weights needed.
+  const weightOf = platform === 'lichess' ? activityWeights(samples) : () => 1;
+  if (platform === 'lichess') console.log('  activity correction: on (weight = 1 / games per day, clipped to p5–p95)');
   report[platform] = {};
   baselines[platform] ??= {};
 
@@ -75,6 +81,7 @@ for (const [platform, tcs] of Object.entries(PLATFORM_TCS)) {
     const points = usable.map((s) => ({
       rating: s.perfs[tc].rating,
       games: effectiveGames(s.perfs, tc, transfer, linkedPerfs(s)),
+      weight: weightOf(s),
     }));
     const curveFit = fitTypicalCurve(points, { minGames: MIN_GAMES, minPlayers: Number(values['min-players']) });
     fits[tc] = { usable, tr, transfer, points, curveFit };
@@ -94,7 +101,7 @@ for (const [platform, tcs] of Object.entries(PLATFORM_TCS)) {
       console.log(`\n  ${tc.padEnd(9)} not enough data (${usable.length} players) – keeping previous parameters`);
       continue;
     }
-    const diff = fitDifficulty(usable.map((s) => s.perfs[tc].rating));
+    const diff = fitDifficulty(usable.map((s) => s.perfs[tc].rating), { weights: usable.map(weightOf) });
     const startBorrowed = !hasBeginners(fits[tc]) && platformStart != null;
 
     const baseline = {

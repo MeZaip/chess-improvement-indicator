@@ -1,9 +1,10 @@
 {
   "name": "chess-improvement-indicator",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Chrome extension: improvement indicator (ii) on lichess.org and chess.com profiles",
+  "license": "Apache-2.0",
   "scripts": {
     "test": "node --test \"tests/**/*.test.js\"",
     "collect:lichess": "node tools/collect.js lichess",
@@ -11,6 +12,7 @@
     "collect:chesscom": "node tools/collect.js chesscom",
     "tail:chesscom": "node tools/collect.js chesscom --tail",
     "link": "node tools/link.js",
-    "fit": "node tools/fit.js"
+    "fit": "node tools/fit.js",
+    "package": "node tools/package.js"
   }
 }

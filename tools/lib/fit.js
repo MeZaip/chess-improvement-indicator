@@ -16,6 +16,18 @@ export function quantile(sorted, q) {
   return sorted[lo] + (sorted[Math.ceil(i)] - sorted[lo]) * (i - lo);
 }
 
+/** Quantile of items [{v, w}] by weight (w defaults to 1). */
+export function weightedQuantile(items, q) {
+  const s = [...items].sort((a, b) => a.v - b.v);
+  const total = s.reduce((a, it) => a + (it.w ?? 1), 0);
+  let acc = 0;
+  for (const it of s) {
+    acc += it.w ?? 1;
+    if (acc >= q * total) return it.v;
+  }
+  return s[s.length - 1].v;
+}
+
 // Weighted pool-adjacent-violators: closest non-decreasing sequence.
 export function isotonic(values, weights) {
   const blocks = [];
@@ -52,16 +64,23 @@ export function fitTypicalCurve(points, { minGames = 30, ratio = 1.6, minBin = 1
   const raw = [...groups.entries()].sort(([a], [b]) => a - b).map(([, ps]) => ps).filter((ps) => ps.length >= minBin);
   if (raw.length < minBins) return null;
 
+  // points may carry a sampling weight (p.weight, default 1): see tools/fit.js
   const bins = raw.map((ps) => {
-    const rs = ps.map((p) => p.rating).sort((a, b) => a - b);
-    return { games: median(ps.map((p) => p.games)), medianRating: quantile(rs, 0.5), p25: quantile(rs, 0.25), p75: quantile(rs, 0.75), n: ps.length };
+    const items = ps.map((p) => ({ v: p.rating, w: p.weight ?? 1 }));
+    return {
+      games: median(ps.map((p) => p.games)),
+      medianRating: weightedQuantile(items, 0.5),
+      p25: weightedQuantile(items, 0.25),
+      p75: weightedQuantile(items, 0.75),
+      n: ps.length,
+    };
   });
   const iso = isotonic(bins.map((b) => b.medianRating), bins.map((b) => b.n));
   bins.forEach((b, i) => (b.typical = iso[i]));
 
   // Start level: weak beginners = p10 of the two least-experienced buckets.
-  const beginners = [...raw[0], ...(raw[1] ?? [])].map((p) => p.rating).sort((a, b) => a - b);
-  const start = Math.round(quantile(beginners, 0.1));
+  const beginners = [...raw[0], ...(raw[1] ?? [])].map((p) => ({ v: p.rating, w: p.weight ?? 1 }));
+  const start = Math.round(weightedQuantile(beginners, 0.1));
 
   return {
     curve: bins.map((b) => [Math.round(b.games), Math.round(b.typical)]),
@@ -96,24 +115,28 @@ export function normSfInv(p) {
 
 /**
  * @param {number[]} ratings  one rating per player (random sample)
+ * @param {{weights?: number[]}} opts  optional sampling weight per player
  * @returns {{knots:[number,number][], reliableMax:number}}
  */
-export function fitDifficulty(ratings, { step = 25, bandwidth = 50, tailMin = 30, extendBy = 600 } = {}) {
-  const xs = [...ratings].sort((a, b) => a - b);
+export function fitDifficulty(ratings, { weights = null, step = 25, bandwidth = 50, tailMin = 30, extendBy = 600 } = {}) {
+  const pairs = ratings.map((r, i) => ({ r, w: weights ? weights[i] : 1 })).sort((a, b) => a.r - b.r);
+  const xs = pairs.map((p) => p.r);
   const n = xs.length;
+  const wTotal = pairs.reduce((a, p) => a + p.w, 0);
+  const wMean = wTotal / n;
 
-  // smoothed survival function: average of normal kernels around each rating
+  // smoothed survival function: (weighted) average of normal kernels around each rating
   const sfSmooth = (r) => {
     let s = 0;
-    for (const x of xs) s += normSf((r - x) / bandwidth);
-    return (s + 0.5) / (n + 1);
+    for (const p of pairs) s += p.w * normSf((r - p.r) / bandwidth);
+    return (s + 0.5 * wMean) / (wTotal + wMean);
   };
 
   // where the data gets thin: fewer than `tailMin` players at or above r
   const reliableMax = xs[Math.max(0, n - tailMin)];
 
   // normal tail anchored at q80 and reliableMax, continuous at reliableMax
-  const q80 = quantile(xs, 0.8);
+  const q80 = weightedQuantile(pairs.map((p) => ({ v: p.r, w: p.w })), 0.8);
   const s1 = sfSmooth(q80), s2 = sfSmooth(reliableMax);
   const z1 = normSfInv(s1), z2 = normSfInv(s2);
   const sigma = z2 > z1 ? (reliableMax - q80) / (z2 - z1) : 200;

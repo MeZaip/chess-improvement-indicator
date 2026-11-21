@@ -61,3 +61,5 @@ h1 > .cii-badge { text-transform: none; letter-spacing: normal; flex: none; }
   font-size: 11px;
 }
 .cii-refresh:hover { text-decoration: underline; }
+.cii-help { color: #8ab4f8; text-decoration: none; }
+.cii-help:hover { text-decoration: underline; }

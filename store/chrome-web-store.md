@@ -2,6 +2,54 @@
 
 Text to paste into the Developer Dashboard. Not part of the extension package.
 
+## Store listing
+
+**Name:** Chess Improvement Indicator
+
+**Summary** (manifest `description`, max 132 characters – currently 132):
+> Shows an improvement indicator on Lichess and Chess.com profiles: how far a player has climbed vs. players with the same experience.
+
+**Category:** pick the closest one in the dashboard (e.g. Entertainment / Games).
+
+**Language:** English
+
+**Detailed description:**
+
+```
+See at a glance how fast a chess player is improving.
+
+Chess Improvement Indicator adds a small badge next to the username on Lichess and Chess.com player profiles. The number shows how far the player has climbed compared with a typical player who has the same amount of experience on that site:
+
+• 1.00x – typical for their experience
+• 2.00x – climbed about twice as far as typical
+• 0.50x – half as far
+
+Click the badge to see the details for bullet, blitz, rapid and classical.
+
+HOW IT WORKS
+• Experience counts games in the time control plus a share of games in the other time controls, mostly the faster ones (e.g. blitz games count towards rapid). The weights are fitted on thousands of real players.
+• "Typical" is the median rating of players with the same experience, measured separately for Lichess and Chess.com – ratings from the two sites are never mixed.
+• Near the typical rating every Elo counts the same, so normal rating swings barely move the number. Far above it, every Elo counts more, because fewer players get there.
+• If a Lichess profile links to the player's Chess.com account, games from both sites are counted.
+• Colours follow familiar move-quality colours, from red (well below typical) to teal (exceptional).
+
+PRIVACY
+No account, no tracking, no ads, no server. The extension only reads public player statistics from the official Lichess and Chess.com public APIs; results are cached on your device for about 10 minutes. Full policy: https://mezaip.github.io/chess-improvement-indicator/privacy
+
+OPEN SOURCE
+https://github.com/MeZaip/chess-improvement-indicator
+
+Not affiliated with, endorsed by or sponsored by Lichess or Chess.com.
+```
+
+## Images
+
+| Asset | Size | File |
+|---|---|---|
+| Store icon | 128×128 | `icons/icon-128.png` (also in the package) |
+| Small promo tile (required) | 440×280 | `store/images/promo-small-440x280.png` |
+| Screenshots (1–5, at least 1) | 1280×800, full bleed | `store/images/screenshot-*.png` |
+
 ## Privacy policy URL
 
 https://mezaip.github.io/chess-improvement-indicator/privacy

@@ -3,7 +3,7 @@ import { test } from 'node:test';
 
 import { BAND, difficulty, expectedScore, getBaseline, improvement, typicalRating } from '../src/core/baseline.js';
 import { MIN_GAMES, combineIndicators, computeIndicator } from '../src/core/indicator.js';
-import { buildReport } from '../src/core/report.js';
+import { applyPageRatings, buildReport } from '../src/core/report.js';
 import { normalizeChesscom } from '../src/providers/chesscom.js';
 import { normalizeLichess } from '../src/providers/lichess.js';
 
@@ -120,4 +120,18 @@ test('buildReport end to end', () => {
   assert.equal(report.classes[1].status, 'insufficient');
   assert.ok(report.overall > 0);
   assert.equal(report.playtime.estimated, true);
+});
+
+test('page ratings replace API ratings, only for known time classes and plausible values', () => {
+  const player = { platform: 'chesscom', username: 'x', playTimeSeconds: null, perfs: {
+    blitz: { rating: 1181, games: 858, provisional: false }, rapid: { rating: 1197, games: 71, provisional: false } } };
+  const { player: p, applied } = applyPageRatings(player, { blitz: 1205, bullet: 1093, rapid: 99999 });
+  assert.equal(applied, true);
+  assert.equal(p.perfs.blitz.rating, 1205);
+  assert.equal(p.perfs.blitz.games, 858, 'game counts stay from the API');
+  assert.equal(p.perfs.rapid.rating, 1197, 'implausible value ignored');
+  assert.equal(p.perfs.bullet, undefined, 'no new time classes invented');
+  assert.equal(player.perfs.blitz.rating, 1181, 'input not mutated');
+  assert.equal(applyPageRatings(player, null).applied, false);
+  assert.equal(applyPageRatings(player, { blitz: 1181 }).applied, false);
 });
