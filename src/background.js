@@ -42,7 +42,22 @@ async function findLinkedAccount(player, opts) {
   return null;
 }
 
+// Remove expired or outdated cached reports, so the cache never turns into a
+// list of profiles the user has visited. Runs at most once per minute.
+let lastPurge = 0;
+async function purgeCache() {
+  if (Date.now() - lastPurge < 60_000) return;
+  lastPurge = Date.now();
+  const all = await chrome.storage.local.get(null);
+  const prefix = `report:v${CACHE_VERSION}:${BASELINE_VERSION}:`;
+  const stale = Object.entries(all)
+    .filter(([key, value]) => key.startsWith('report:') && (!key.startsWith(prefix) || !(Date.now() - value?.at < CACHE_TTL_MS)))
+    .map(([key]) => key);
+  if (stale.length) await chrome.storage.local.remove(stale);
+}
+
 async function getReport(platform, username, { force = false } = {}) {
+  purgeCache().catch(() => {});
   const key = `report:v${CACHE_VERSION}:${BASELINE_VERSION}:${platform}:${username.toLowerCase()}`;
   if (!force) {
     const cached = (await chrome.storage.local.get(key))[key];

@@ -7,6 +7,9 @@ improvement indicator.
 `ii = 1.5x` means: *this player climbed about 1.5× as far as a typical
 player with the same amount of experience.*
 
+Privacy: the extension has no server and collects nothing; see the
+[privacy policy](docs/privacy.md).
+
 ## How ii is computed
 
 For each platform × time class (fitted on a random sample of players):

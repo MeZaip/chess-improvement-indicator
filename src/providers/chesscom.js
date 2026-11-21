@@ -7,6 +7,7 @@ import { checkResponse } from './errors.js';
 export async function fetchChesscomPlayer(username, { fresh = false } = {}) {
   const res = await fetch(`https://api.chess.com/pub/player/${encodeURIComponent(username.toLowerCase())}/stats`, {
     cache: fresh ? 'no-cache' : 'default',
+    credentials: 'omit', // never send the user's chess.com cookies
   });
   return normalizeChesscom(username, await checkResponse(res).json());
 }

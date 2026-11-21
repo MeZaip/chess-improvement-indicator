@@ -7,6 +7,7 @@ export async function fetchLichessPlayer(username, { fresh = false } = {}) {
   const res = await fetch(`https://lichess.org/api/user/${encodeURIComponent(username)}`, {
     headers: { Accept: 'application/json' },
     cache: fresh ? 'no-cache' : 'default',
+    credentials: 'omit', // never send the user's Lichess cookies
   });
   return normalizeLichess(await checkResponse(res).json());
 }
